@@ -104,6 +104,20 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+    //Ramon Driving
+    char *array[MAXARGS];
+    pid_t notParent;
+    int thread; //process
+    int background = parseline(cmdline, array); //parse it
+
+    if(builtin_cmd(array))
+        exit(1);
+    notParent = fork();
+    //child, so go on
+    if(notParent == 0)
+        execv(array[0], array);
+    else //wait if parent
+        waitpid(notParent, &thread, 0);
     return;
 }
 
@@ -116,6 +130,9 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
+    //Paras Driving, exit if quit
+    if(strcmp(argv[0], "quit") == 0)
+        exit(1);
     return 0;     /* not a builtin command */
 }
 
