@@ -54,7 +54,41 @@ int main(int argc, char **argv)
  */
 static void doFib(int n, int doPrint)
 {
-  
+    //Paras Driving
+    //adding Variable
+    int go1, go2, thread1, thread2, solution;
+    pid_t notparent1, notParent2;
+
+    if(n==0 || n == 1) {
+        if(doPrint != 0)
+            printf("%d\n", n);
+        exit(n);
+    }
+    else { //Ramon Driving
+        notparent1 = fork();
+
+        if(notparent1 != 0) {
+            //wait and tell us the status
+            waitpid(notparent1, &thread1, 0);
+            go1 = WEXITSTATUS(thread1);
+
+            notParent2 = fork();
+            if(notParent2 != 0) {
+                waitpid(notParent2, &thread2, 0);
+                go2 = WEXITSTATUS(thread2);
+                if(doPrint == 1)
+                    printf("%d\n", (go2 + go1));
+                else
+                    exit((go2 + go1));
+            }
+            //Now time to recurse it
+            else
+                doFib(n-2, 0);
+        }
+        //recursing again
+        else
+            doFib(n-1, 0);
+    }
 }
 
 
