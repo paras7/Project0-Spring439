@@ -135,7 +135,22 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
-    return 0;     /* not a builtin command */
+    //Paras Driving
+    //Tried using switch statements, realized it doesn't work on strings
+    //so switched to if statement.
+    if(strcmp(argv[0], "quit") == 0) //quit
+        exit(0);
+    else if(strcmp(argv[0], "fg") == 0) //fg
+        do_bgfg(argv);
+    else if(strcmp(argv[0], "jobs") == 0) //jobs
+        listjobs(jobs);
+    else if(strcmp(argv[0], "bg") == 0) //bg
+        do_bgfg(argv);
+    else if(argv[0] == NULL) //for safety
+        return 1; 
+    else
+        return 0;
+    return 1;
 }
 
 /* 
@@ -151,6 +166,7 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
+    while(fgpid(jobs) == pid) {}
     return;
 }
 
@@ -177,7 +193,22 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-    return;
+    char cmdline[MAXLINE];
+    pid_t id = fgpid(jobs);
+    if(id == 0) {
+        return;
+    } else {
+        struct job_t* jobstruct = getjobpid(jobs, id);
+        sprintf(cmdline, "Job [%d] (%d) terminated by signal %d\n", jobstruct->jid, id, sig);
+        ssize_t size; 
+        const int STDOUT = 1; 
+        size = write(STDOUT, cmdline, strlen(cmdline)); 
+        if(size != strlen(cmdline)) 
+            return;
+        kill(-id, SIGINT);
+        deletejob(jobs, jobstruct->pid);
+        return;
+    }
 }
 
 /*
@@ -187,6 +218,22 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+    char cmdline[MAXLINE];
+    pid_t id = fgpid(jobs);
+    if(id == 0) {
+        return;
+    } else {
+        struct job_t* jobstruct = getjobpid(jobs, id);
+        sprintf(cmdline, "Job [%d] (%d) stopped by signal %d\n", jobstruct->jid, id, sig);
+        ssize_t size; 
+        const int STDOUT = 1; 
+        size = write(STDOUT, cmdline, strlen(cmdline)); 
+        if(size != strlen(cmdline)) 
+            return;
+        kill(-id, SIGTSTP);
+        deletejob(jobs, jobstruct->pid);
+        return;
+    }
     return;
 }
 
