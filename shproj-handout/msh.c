@@ -42,7 +42,7 @@ void usage(void);
 void sigquit_handler(int sig);
 
 /*Declaration of our function*/
-void forParent(char **cmdline, sigset_t set);
+void forNotParent(char **cmdline, sigset_t set);
 
 
 
@@ -139,20 +139,20 @@ void eval(char *cmdline)
 
         kid = fork(); //child made
         
-        // parent
-        if(kid != 0) {
-            forParent(argument, set2);      
+        // child
+        if(kid == 0) {
+            forNotParent(argument, set2);      
         }
-        //child
+        //parent
         else {
             sigdelset(&set, SIGCHLD);
-            if(back == 0) { //background
+            if(back == 0) { //foreground
                 addjob(jobs, kid, 1, cmdline);
                 sigprocmask(SIG_SETMASK, &set2, NULL);
                 //gotta bg
                 waitfg(kid);
             }
-            else { //foreground
+            else { //background
                 addjob(jobs, kid, 2, cmdline);
                 sigprocmask(SIG_SETMASK, &set2, NULL);
                 printf("[%d] (%d) %s", getjobpid(jobs, kid)->jid, kid, cmdline);
@@ -165,7 +165,6 @@ void eval(char *cmdline)
         return;
     return;
 }
-
 
 
 /* 
@@ -199,38 +198,38 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
-    char* argument = argv[1] + sizeof(char);;
-    pid_t pId = atoi(argv[1]);
-    int pp = atoi(argument);
     struct job_t *notPid;
     //to check if background or foreground
     int back = (*argv[0] == 'b');
 
     if(argv[1] == NULL) {
-        if(strcmp(argv[0], "bg") == 0)
-            printf("bg: command requires PID or %%jobid argument\n");
-        else if(strcmp(argv[0], "fg") == 0)
-            printf("fg: command requires PID or %%jobid argument\n");
+        if(back)
+            printf("bg command requires PID or %%jobid argument\n");
+        else if(!back)
+            printf("fg command requires PID or %%jobid argument\n");
         else
             return;
     }
-    else if(argv[1] != NULL) {
+    else if((argv[1] != NULL)) {
         if(strchr(argv[1], '%') == NULL) {
             //FOR PID
+            pid_t pId = atoi(argv[1]);
             notPid = getjobpid(jobs, pId);
-
-            if(notPid == NULL) {
-                printf("(%d): No such process\n", pId);
-                return; 
-           }
 
             if(atoi(argv[1]) == 0) {
                 printf("%s: argument must be a PID or %%jobid\n", argv[0]);
                 return; 
             }
+
+            if(notPid == NULL) {
+                printf("(%d): No such process\n", pId);
+                return; 
+           }
         }
         else {
             //FOR JID
+            char* argument = argv[1] + sizeof(char);
+            int pp = atoi(argument);
             notPid = getjobjid(jobs, pp);
             if(notPid == NULL) {
                 printf("%s: No such job\n", argv[1]);
@@ -254,8 +253,6 @@ void do_bgfg(char **argv)
             waitfg(notPid->pid);
         }
     }
-    else
-        return;
     return;
 }
 
@@ -278,9 +275,8 @@ void waitfg(pid_t pid)
     while(fgpid(jobs) == pid)
         sigsuspend(&set2);
 
-    sigprocmask(SIG_BLOCK, &set2, NULL);
+    sigprocmask(SIG_SETMASK, &set2, NULL);
     //time to unblock ^
-
     return;
 }
 
@@ -299,32 +295,32 @@ void waitfg(pid_t pid)
 void sigchld_handler(int sig) 
 {
     int pp;
-    pid_t id;
+    pid_t id = waitpid(-1, &pp, WUNTRACED|WNOHANG);
     char argument[MAXLINE];
 
-    while((id = waitpid(-1, &pp, WUNTRACED|WNOHANG)) > 0) {
+    if(id <= 0)
+        return;
+
+    else if(id > 0) {
         struct job_t* notPid = getjobpid(jobs, id);
 
         if(notPid == NULL)
         return;
 
-        
-        if(WIFSTOPPED(argument)) {
-            if(notPid->state != ST){
-                notPid->state = ST;
-                sprintf(argument, "Job [%d] (%d) stopped by signal %d\n", notPid->jid, id, WSTOPSIG(pp));
-                if(write(1, argument, strlen(argument)) != strlen(argument))
-                    return;
-            }
+        if(WIFSTOPPED(pp)) {
+            notPid->state = ST;
+            sprintf(argument, "Job [%d] (%d) stopped by signal %d\n", notPid->jid, id, WSTOPSIG(pp));
+            if(write(1, argument, strlen(argument)) != strlen(argument))
+                return;
         }
-        else if(WIFSIGNALED(argument)) {
+        else if(WIFSIGNALED(pp)) {
             sprintf(argument, "Job [%d] (%d) terminated by signal %d\n", notPid->jid, id, WTERMSIG(pp));
             if(write(1, argument, strlen(argument)) != strlen(argument)) 
                 return;
             deletejob(jobs, id);
             return;
         }
-        else if(WIFEXITED(argument)) {
+        else if(WIFEXITED(pp)) {
             deletejob(jobs, id);
             return;
         }
@@ -364,6 +360,46 @@ void sigtstp_handler(int sig)
     }
     return;
 }
+//  void sigint_handler(int sig) 
+// {
+//   char section[MAXLINE];
+//   pid_t pId = fgpid(jobs);
+//   if(pId != 0) { //if there is no fg job, ignore
+//     struct job_t* jobstruct = getjobpid(jobs, pId);
+//     sprintf(section, "Job [%d] (%d) terminated by signal %d\n", jobstruct->jid, pId, sig);
+//     if(write(1, section, strlen(section)) != strlen(section))
+//       return;
+//     kill(-pId, SIGINT); //kill all jobs in this group
+//     deletejob(jobs, jobstruct->pid);
+//     return;
+//   }
+//   else {
+//     return;
+//   }
+// }
+
+
+//  * sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever
+//  *     the user types ctrl-z at the keyboard. Catch it and suspend the
+//  *     foreground job by sending it a SIGTSTP.  
+ 
+// void sigtstp_handler(int sig) 
+// {
+//   char section[MAXLINE];
+//   pid_t pId = fgpid(jobs);
+//   if(pId != 0) { //if there is no bg job, ignore
+//     struct job_t* joby = getjobpid(jobs, pId);
+//     getjobpid(jobs, pId)->state = 3;
+//     sprintf(section, "Job [%d] (%d) stopped by signal %d\n", joby->jid, pId, sig);
+//     if(write(1, section, strlen(section)) != strlen(section))
+//       return;
+//     kill(-pId, SIGTSTP); //kill all jobs in this group
+//     return;
+//   }
+//   else {
+//     return;
+//   }
+// }
 
 /*********************
  * End signal handlers
@@ -401,10 +437,17 @@ void sigquit_handler(int sig)
     exit(1);
 }
 
-void forParent(char **cmdline, sigset_t set) {
+void forNotParent(char **cmdline, sigset_t set) {
+    // sigprocmask(SIG_SETMASK, &set, NULL);
+    // if(execv(cmdline[0], cmdline) < 0) {
+    //     printf("%s: Command not found\n", cmdline[0]);
+    //     exit(0);
+    // }
+    setpgid(0,0);
+    sigemptyset(&set);
     sigprocmask(SIG_SETMASK, &set, NULL);
-    if(execv(cmdline[0], cmdline) < 0) {
-        printf("%s: Command not found\n", cmdline[0]);
-        exit(0);
-    }
+    execv(cmdline[0], cmdline);
+    // printf("%s: Command not found\n",section[0]);
+    exit(0);
+
 }
