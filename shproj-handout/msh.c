@@ -242,8 +242,8 @@ void do_bgfg(char **argv)
         }
 
         if(back) {
-            printf("[%d] (%d) %s", notPid->jid, notPid->pid, notPid->cmdline);
-
+            //printf("[%d] (%d) %s", notPid->jid, notPid->pid, notPid->cmdline);
+            //Relized we dont need this^ after 2 hours of figuring out what was wrong! RIP
             kill(-(notPid->pid), SIGCONT);
             notPid->state = BG;
         }
