@@ -110,7 +110,7 @@ void eval(char *cmdline)
     int thread; //process
     int background = parseline(cmdline, array); //parse it
 
-    if(builtin_cmd(array))
+    if(builtin_cmd( array))
         exit(1);
     notParent = fork();
     //child, so go on

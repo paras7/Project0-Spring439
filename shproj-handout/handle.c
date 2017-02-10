@@ -24,16 +24,26 @@ int main(int argc, char **argv)
 	//Ramon driving
 	int k;
 	struct timespec* timer;
+	//using nano seconds
 	timer = (struct timespec*)malloc(sizeof(struct timespec));
 	timer->tv_nsec = 100000000;
 
 	pid_t id = getpid();
 	printf("%d\n", id);
 
+	//sending out signal based on what it is
 	signal(SIGINT, try);
 	signal(SIGUSR1, bad);
 
 	for(; 1; ) {
+		//We have 8 zeros above for nanosleep and this for loop below
+		//makes sure Still here is printed every second
+
+		//We tried doing it with 9 zeros above and no for loop below, but
+		//doesn't work for some reason
+
+		//Okay, after talking to someone it might be because nanosleep can't
+		//have 9 zeros and that is why it doesn't work
 		for(k= 0; k < 10; k++) {
 			nanosleep(timer, 0);
 		}
@@ -44,11 +54,13 @@ int main(int argc, char **argv)
 }
 
 //Paras Driving
+//Helper function to print Nice try
 void try() {
 	if(write(1, "Nice try.\n", 10) != 10)
 		exit(-1);
 }
 
+//Helper function to print Exiting
 void bad() {
 	if(write(1, "exiting\n", 8) != 8)
 		exit(-1);

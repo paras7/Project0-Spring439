@@ -59,19 +59,21 @@ static void doFib(int n, int doPrint)
     int go1, go2, thread1, thread2, solution;
     pid_t notparent1, notParent2;
 
+    //if it is 0 or 1 it should just print that because that's
+    //how fibonacci sequence works.
     if(n==0 || n == 1) {
         if(doPrint != 0)
             printf("%d\n", n);
         exit(n);
     }
-    else { //Ramon Driving
+    else {
         notparent1 = fork();
 
         if(notparent1 != 0) {
             //wait and tell us the status
             waitpid(notparent1, &thread1, 0);
             go1 = WEXITSTATUS(thread1);
-
+            //Ramon Driving
             notParent2 = fork();
             if(notParent2 != 0) {
                 waitpid(notParent2, &thread2, 0);
